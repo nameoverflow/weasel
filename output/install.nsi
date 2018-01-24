@@ -5,7 +5,7 @@
 
 ; The StdUtils plugin
 !addincludedir "StdUtils.2015-11-16\Include"
-!addplugindir /x86-unicode "StdUtils.2015-11-16\Plugins\Release_Unicode"
+!addplugindir "StdUtils.2015-11-16\Plugins\Release_Unicode"
 !include "StdUtils.nsh" ; for ExecShellAsUser()
 
 !define WEASEL_VERSION 0.9.30
