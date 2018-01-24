@@ -3,6 +3,11 @@
 !include LogicLib.nsh
 !include x64.nsh
 
+; The StdUtils plugin
+!addincludedir "StdUtils.2015-11-16\Include"
+!addplugindir /x86-unicode "StdUtils.2015-11-16\Plugins\Release_Unicode"
+!include "StdUtils.nsh" ; for ExecShellAsUser()
+
 !define WEASEL_VERSION 0.9.30
 !define WEASEL_BUILD ${WEASEL_VERSION}.0
 
@@ -155,6 +160,10 @@ program_files:
   ; run as user...
   ExecWait "$INSTDIR\WeaselDeployer.exe /install"
 
+  ; Launch the WeaselServer
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "WeaselServer" "$INSTDIR\WeaselServer.exe"
+  ${StdUtils.ExecShellAsUser} $0 "$INSTDIR\PIMELauncher.exe" "open" ""
+
   ; Write the uninstall keys for Windows
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Weasel" "DisplayName" "小狼毫輸入法"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Weasel" "UninstallString" '"$INSTDIR\uninstall.exe"'
@@ -203,6 +212,7 @@ Section "Uninstall"
   ; Remove registry keys
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Weasel"
   DeleteRegKey HKLM SOFTWARE\Rime
+  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "WeaselServer"
 
   ; Remove files and uninstaller
   SetOutPath $TEMP
