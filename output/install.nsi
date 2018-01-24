@@ -162,7 +162,7 @@ program_files:
 
   ; Launch the WeaselServer
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "WeaselServer" "$INSTDIR\WeaselServer.exe"
-  ${StdUtils.ExecShellAsUser} $0 "$INSTDIR\PIMELauncher.exe" "open" ""
+  ${StdUtils.ExecShellAsUser} $0 "$INSTDIR\WeaselServer.exe" "open" ""
 
   ; Write the uninstall keys for Windows
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Weasel" "DisplayName" "小狼毫輸入法"
