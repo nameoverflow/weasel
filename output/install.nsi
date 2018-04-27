@@ -6,7 +6,7 @@
 
 Unicode true
 
-!define WEASEL_VERSION 0.11.0
+!define WEASEL_VERSION 0.11.1
 !define WEASEL_BUILD ${WEASEL_VERSION}.0
 
 !define WEASEL_ROOT $INSTDIR\weasel-${WEASEL_VERSION}
@@ -114,6 +114,12 @@ Section "Weasel"
 program_files:
   File "LICENSE.txt"
   File "README.txt"
+  File "7-zip-license.txt"
+  File "7z.dll"
+  File "7z.exe"
+  File "COPYING-curl.txt"
+  File "curl.exe"
+  File "curl-ca-bundle.crt"
   File "rime-install.bat"
   File "rime-install-config.bat"
   File "weasel.dll"

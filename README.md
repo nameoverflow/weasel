@@ -81,6 +81,7 @@
 ### 本品引用了以下開源軟件：
 
   * [Boost C++ Libraries](http://www.boost.org/) (Boost Software License)
+  * [curl](https://curl.haxx.se/) (MIT/X derivate license)
   * [google-glog](https://github.com/google/glog) (BSD 3-Clause License)
   * [Google Test](https://github.com/google/googletest) (BSD 3-Clause License)
   - [Kyoto Cabinet](http://fallabs.com/kyotocabinet/) (GNU General Public License)
@@ -91,6 +92,7 @@
   * [plum](https://github.com/rime/plum) (GNU Lesser General Public License v3.0)
   * [WinSparkle](https://github.com/vslavik/winsparkle) (MIT License)
   * [yaml-cpp](https://github.com/jbeder/yaml-cpp) (MIT License)
+  * [7-Zip](https://www.7-zip.org) (GNU LGPLv2.1+ with unRAR restriction)
 
 問題與反饋
 ----------
