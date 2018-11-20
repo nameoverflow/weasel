@@ -212,6 +212,14 @@ namespace weasel
 			client_caps(0) {}
 	};
 }
+enum class InstallRegion {
+	CN,
+	TW,
+	HK,
+	MO,
+	SG
+};
+
 namespace boost {
 	namespace serialization {
 		template <typename Archive>

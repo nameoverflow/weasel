@@ -5,6 +5,7 @@
 #include <WeaselCommon.h>
 #include <msctf.h>
 #include <strsafe.h>
+#include "WeaselSetup.h"
 
 
 // {A3F4CDED-B1E9-41EE-9CA6-7B4D0DE6CB0A}
@@ -14,6 +15,30 @@ static const GUID c_clsidTextService =
 // {3D02CAB6-2B8E-4781-BA20-1C9267529467}
 static const GUID c_guidProfile = 
 { 0x3d02cab6, 0x2b8e, 0x4781, { 0xba, 0x20, 0x1c, 0x92, 0x67, 0x52, 0x94, 0x67 } };
+
+BOOL is_region_hant(const InstallRegion region) {
+	switch (region) {
+	case InstallRegion::CN:
+	case InstallRegion::SG:
+		return FALSE;
+	default:
+		return TRUE;
+	}
+}
+DWORD get_keyboard_id(const InstallRegion region) {
+	switch (region) {
+	case InstallRegion::CN:
+		return 0x00000804;
+	case InstallRegion::SG:
+		return 0x00001004;
+	case InstallRegion::MO:
+		return 0x00001404;
+	case InstallRegion::TW:
+		return 0x00000404;
+	case InstallRegion::HK:
+		return 0x00000c04;
+	}
+}
 
 
 BOOL copy_file(const std::wstring& src, const std::wstring& dest)
@@ -67,14 +92,14 @@ BOOL is_wow64()
 
 typedef BOOL (WINAPI *PW64DW64FR)(PVOID *);
 typedef BOOL (WINAPI *PW64RW64FR)(PVOID);
-typedef int (*ime_register_func)(const std::wstring& ime_path, bool register_ime, bool is_wow64, bool hant, bool silent);
+typedef int (*ime_register_func)(const std::wstring& ime_path, bool register_ime, bool is_wow64, InstallRegion region, bool silent);
 
-int install_ime_file(std::wstring& srcPath, const std::wstring& ext, bool hant, bool silent, ime_register_func func)
+int install_ime_file(std::wstring& srcPath, const std::wstring& ext, InstallRegion region, bool silent, ime_register_func func)
 {
 	WCHAR path[MAX_PATH];
 	GetModuleFileNameW(GetModuleHandle(NULL), path, _countof(path));
 
-	std::wstring srcFileName = (hant ? L"weaselt" : L"weasel");
+	std::wstring srcFileName = (is_region_hant(region) ? L"weaselt" : L"weasel");
 	srcFileName += ext;
 	WCHAR drive[_MAX_DRIVE];
 	WCHAR dir[_MAX_DIR];
@@ -91,7 +116,7 @@ int install_ime_file(std::wstring& srcPath, const std::wstring& ext, bool hant, 
 		if (!silent) MessageBoxW(NULL, destPath.c_str(), L"安裝失敗", MB_ICONERROR | MB_OK);
 		return 1;
 	}
-	retval += func(destPath, true, false, hant, silent);
+	retval += func(destPath, true, false, region, silent);
 	if (is_wow64())
 	{
 		ireplace_last(srcPath, ext, L"x64" + ext);
@@ -108,7 +133,7 @@ int install_ime_file(std::wstring& srcPath, const std::wstring& ext, bool hant, 
 			if (!silent) MessageBoxW(NULL, destPath.c_str(), L"安裝失敗", MB_ICONERROR | MB_OK);
 			return 1;
 		}
-		retval += func(destPath, true, true, hant, silent);
+		retval += func(destPath, true, true, region, silent);
 		if (fnWow64RevertWow64FsRedirection == NULL || fnWow64RevertWow64FsRedirection(OldValue) == FALSE)
 		{
 			if (!silent) MessageBoxW(NULL, L"無法恢復文件系統重定向", L"安裝失敗", MB_ICONERROR | MB_OK);
@@ -125,7 +150,7 @@ int uninstall_ime_file(const std::wstring& ext, bool silent, ime_register_func f
 	GetSystemDirectoryW(path, _countof(path));
 	std::wstring imePath(path);
 	imePath += L"\\weasel" + ext;
-	retval += func(imePath, false, false, false, silent);
+	retval += func(imePath, false, false, InstallRegion::CN, silent);
 	if (!delete_file(imePath))
 	{
 		if (!silent) MessageBox(NULL, imePath.c_str(), L"卸載失敗", MB_ICONERROR | MB_OK);
@@ -133,7 +158,7 @@ int uninstall_ime_file(const std::wstring& ext, bool silent, ime_register_func f
 	}
 	if (is_wow64())
 	{
-		retval += func(imePath, false, true, false, silent);
+		retval += func(imePath, false, true, InstallRegion::CN, silent);
 		PVOID OldValue = NULL;
 		PW64DW64FR fnWow64DisableWow64FsRedirection = (PW64DW64FR)GetProcAddress(GetModuleHandle(_T("kernel32.dll")), "Wow64DisableWow64FsRedirection");
 		PW64RW64FR fnWow64RevertWow64FsRedirection = (PW64RW64FR)GetProcAddress(GetModuleHandle(_T("kernel32.dll")), "Wow64RevertWow64FsRedirection");
@@ -157,7 +182,7 @@ int uninstall_ime_file(const std::wstring& ext, bool silent, ime_register_func f
 }
 
 // 注册IME输入法
-int register_ime(const std::wstring& ime_path, bool register_ime, bool is_wow64, bool hant, bool silent)
+int register_ime(const std::wstring& ime_path, bool register_ime, bool is_wow64, InstallRegion region, bool silent)
 {
 	if (is_wow64)
 	{
@@ -178,7 +203,7 @@ int register_ime(const std::wstring& ime_path, bool register_ime, bool is_wow64,
 			LSTATUS ret = RegOpenKey(HKEY_LOCAL_MACHINE, KEYBOARD_LAYOUTS_KEY, &hKey);
 			if (ret == ERROR_SUCCESS)
 			{
-				for (DWORD k = 0xE0200000 + (hant ? 0x0404 : 0x0804); k <= 0xE0FF0804; k += 0x10000)
+				for (DWORD k = 0xE0200000 + get_keyboard_id(region); k <= 0xE0FF1404; k += 0x10000)
 				{
 					StringCchPrintfW(hkl_str, _countof(hkl_str), L"%08X", k);
 					HKEY hSubKey;
@@ -272,7 +297,11 @@ int register_ime(const std::wstring& ime_path, bool register_ime, bool is_wow64,
 			break;
 
 		// 中文键盘布局?
-		if (wcscmp(subKey + 4, L"0804") == 0 || wcscmp(subKey + 4, L"0404") == 0)
+		if (wcscmp(subKey + 4, L"0804") == 0 ||
+			wcscmp(subKey + 4, L"0404") == 0 ||
+			wcscmp(subKey + 4, L"0c04") == 0 ||
+			wcscmp(subKey + 4, L"1404") == 0 ||
+			wcscmp(subKey + 4, L"1004") == 0)
 		{
 			HKEY hSubKey;
 			ret = RegOpenKey(hKey, subKey, &hSubKey);
@@ -342,7 +371,7 @@ int register_ime(const std::wstring& ime_path, bool register_ime, bool is_wow64,
 	return 0;
 }
 
-void enable_profile(BOOL fEnable, bool hant) {
+void enable_profile(BOOL fEnable, InstallRegion region) {
 	HRESULT hr;
 	ITfInputProcessorProfiles *pProfiles = NULL;
 
@@ -355,7 +384,7 @@ void enable_profile(BOOL fEnable, bool hant) {
 
 	if(SUCCEEDED(hr))
 	{
-		LANGID lang_id = hant ? 0x0404 : 0x0804;
+		LANGID lang_id = (LANGID)get_keyboard_id(region);
 		//Use the interface. 
 		pProfiles->EnableLanguageProfile(c_clsidTextService, lang_id, c_guidProfile, fEnable);
 		pProfiles->EnableLanguageProfileByDefault(c_clsidTextService, lang_id, c_guidProfile, fEnable);
@@ -366,12 +395,12 @@ void enable_profile(BOOL fEnable, bool hant) {
 }
 
 // 注册TSF输入法
-int register_text_service(const std::wstring& tsf_path, bool register_ime, bool is_wow64, bool hant, bool silent)
+int register_text_service(const std::wstring& tsf_path, bool register_ime, bool is_wow64, InstallRegion region, bool silent)
 {
 	using RegisterServerFunction = HRESULT (STDAPICALLTYPE *)();
 
 	if (!register_ime)
-		enable_profile(FALSE, hant);
+		enable_profile(FALSE, region);
 
 	std::wstring params = L" \"" + tsf_path + L"\"";
 	if (!register_ime)
@@ -406,17 +435,17 @@ int register_text_service(const std::wstring& tsf_path, bool register_ime, bool 
 	}
 
 	if (register_ime)
-		enable_profile(TRUE, hant);
+		enable_profile(TRUE, region);
 
 	return 0;
 }
 
-int install(bool hant, bool silent)
+int install(InstallRegion region, bool silent)
 {
 	std::wstring ime_src_path;
 	int retval = 0;
-	retval += install_ime_file(ime_src_path, L".ime", hant, silent, &register_ime);
-	retval += install_ime_file(ime_src_path, L".dll", hant, silent, &register_text_service);
+	retval += install_ime_file(ime_src_path, L".ime", region, silent, &register_ime);
+	retval += install_ime_file(ime_src_path, L".dll", region, silent, &register_text_service);
 
 	// 写注册表
 	HKEY hKey;

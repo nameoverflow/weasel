@@ -2,6 +2,7 @@
 #include "Register.h"
 #include <strsafe.h>
 #include <VersionHelpers.hpp>
+#include <WeaselCommon.h>
 
 #define CLSID_STRLEN 38  // strlen("{xxxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx}")
 
@@ -9,16 +10,35 @@ static const char c_szInfoKeyPrefix[] = "CLSID\\";
 static const char c_szTipKeyPrefix[] = "Software\\Microsft\\CTF\\TIP\\";
 static const char c_szInProcSvr32[] = "InprocServer32";
 static const char c_szModelName[] = "ThreadingModel";
+static const wchar_t c_szWeaselKey[] = L"Software\\Rime\\Weasel";
 
-HKL FindIME()
+DWORD GetLangID(const InstallRegion region)
+{
+	switch (region) {
+	case InstallRegion::CN:
+		return MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED);
+	case InstallRegion::SG:
+		return MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SINGAPORE);
+	case InstallRegion::MO:
+		return MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_MACAU);
+	case InstallRegion::TW:
+		return MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL);
+	case InstallRegion::HK:
+		return MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_HONGKONG);
+	}
+	
+}
+
+HKL FindIME(DWORD langid)
 {
 	HKL hKL = NULL;
 	WCHAR key[9];
 	HKEY hKey;
-	LSTATUS ret = RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Keyboard Layouts", 0, KEY_READ, &hKey);
+	LSTATUS ret;
+	ret = RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Keyboard Layouts", 0, KEY_READ, &hKey);
 	if (ret == ERROR_SUCCESS)
 	{
-		for (DWORD id = (0xE0200000 | TEXTSERVICE_LANGID); hKL == NULL && id <= (0xE0FF0000 | TEXTSERVICE_LANGID); id += 0x10000)
+		for (DWORD id = (0xE0200000 | langid); hKL == NULL && id <= (0xE0FF0000 | langid); id += 0x10000)
 		{
 			StringCchPrintfW(key, _countof(key), L"%08X", id);
 			HKEY hSubKey;
@@ -39,11 +59,32 @@ HKL FindIME()
 	return hKL;
 }
 
+InstallRegion GetRegionFromReg() {
+	InstallRegion region = InstallRegion::CN;
+	HKEY hKey;
+	auto ret = RegOpenKey(HKEY_CURRENT_USER, c_szWeaselKey, &hKey);
+	if (ret == ERROR_SUCCESS)
+	{
+		DWORD type = 0;
+		DWORD data = 0;
+		DWORD len = 0;
+		ret = RegQueryValueEx(hKey, L"Region", NULL, &type, (LPBYTE)&data, &len);
+		if (ret == ERROR_SUCCESS && type == REG_DWORD)
+		{
+			region = (InstallRegion)data;
+		}
+		RegCloseKey(hKey);
+	}
+	return region;
+}
+
 BOOL RegisterProfiles()
 {
 	WCHAR achIconFile[MAX_PATH];
 	ULONG cchIconFile = GetModuleFileNameW(g_hInst, achIconFile, ARRAYSIZE(achIconFile));
 	HRESULT hr;
+	InstallRegion region = GetRegionFromReg();
+	const auto langid = GetLangID(region);
 
 	if (IsWindows8OrGreater())
 	{
@@ -54,14 +95,14 @@ BOOL RegisterProfiles()
 
 		hr = pInputProcessorProfileMgr->RegisterProfile(
 			c_clsidTextService,
-			TEXTSERVICE_LANGID,
+			langid,
 			c_guidProfile,
 			TEXTSERVICE_DESC,
 			(ULONG)wcslen(TEXTSERVICE_DESC),
 			achIconFile,
 			cchIconFile,
 			TEXTSERVICE_ICON_INDEX,
-			FindIME(),
+			FindIME(langid),
 			0,
 			TRUE,
 			0);
@@ -79,7 +120,7 @@ BOOL RegisterProfiles()
 
 		hr = pInputProcessorProfiles->AddLanguageProfile(
 			c_clsidTextService,
-			TEXTSERVICE_LANGID,
+			langid,
 			c_guidProfile,
 			TEXTSERVICE_DESC,
 			(ULONG)wcslen(TEXTSERVICE_DESC),
@@ -90,7 +131,7 @@ BOOL RegisterProfiles()
 			return FALSE;
 
 		hr = pInputProcessorProfiles->SubstituteKeyboardLayout(
-			c_clsidTextService, TEXTSERVICE_LANGID, c_guidProfile, FindIME());
+			c_clsidTextService, langid, c_guidProfile, FindIME(langid));
 		if (FAILED(hr))
 			return FALSE;
 	}

@@ -38,7 +38,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	return ret;
 }
 
-int install(bool hant, bool silent);
+int install(InstallRegion region, bool silent);
 int uninstall(bool silent);
 bool has_installed();
 
@@ -47,6 +47,7 @@ static int CustomInstall(bool installing)
 	bool hant = false;
 	bool silent = false;
 	std::wstring user_dir;
+	InstallRegion region = InstallRegion::CN;
 
 	const WCHAR KEY[] = L"Software\\Rime\\Weasel";
 	HKEY hKey;
@@ -63,12 +64,19 @@ static int CustomInstall(bool installing)
 			user_dir = value;
 		}
 		len = sizeof(data);
+		// legacy: old installation on Hant
 		ret = RegQueryValueEx(hKey, L"Hant", NULL, &type, (LPBYTE)&data, &len);
 		if (ret == ERROR_SUCCESS && type == REG_DWORD)
 		{
-			hant = (data != 0);
+			hant = true;
+			region = data != 0 ? InstallRegion::TW : InstallRegion::CN;
 			if (installing)
 				silent = true;
+		}
+		ret = RegQueryValueEx(hKey, L"Region", NULL, &type, (LPBYTE)&data, &len);
+		if (ret == ERROR_SUCCESS && type == REG_DWORD)
+		{
+			region = (InstallRegion)data;
 		}
 		RegCloseKey(hKey);
 	}
@@ -77,18 +85,19 @@ static int CustomInstall(bool installing)
 	{
 		InstallOptionsDialog dlg;
 		dlg.installed = has_installed();
-		dlg.hant = hant;
+		dlg.region = region;
+		//dlg.hant = hant;
 		dlg.user_dir = user_dir;
 		if (IDOK != dlg.DoModal()) {
 			if (!installing)
 				return 1;  // aborted by user
 		}
 		else {
-			hant = dlg.hant;
+			region = dlg.region;
 			user_dir = dlg.user_dir;
 		}
 	}
-	if (0 != install(hant, silent))
+	if (0 != install(region, silent))
 		return 1;
 
 	ret = RegCreateKeyEx(HKEY_CURRENT_USER, KEY,
@@ -108,14 +117,23 @@ static int CustomInstall(bool installing)
 		return 1;
 	}
 
-	DWORD data = hant ? 1 : 0;
-	ret = RegSetValueEx(hKey, L"Hant", 0, REG_DWORD, (const BYTE*)&data, sizeof(DWORD));
+	//DWORD data = hant ? 1 : 0;
+	//ret = RegSetValueEx(hKey, L"Hant", 0, REG_DWORD, (const BYTE*)&data, sizeof(DWORD));
+	//if (FAILED(HRESULT_FROM_WIN32(ret)))
+	//{
+	//	MessageBox(NULL, L"無法寫入 Hant", L"安裝失敗", MB_ICONERROR | MB_OK);
+	//	return 1;
+	//}
+	if (hant) {
+		RegDeleteValueW(hKey, L"Hant");
+	}
+	DWORD data = (DWORD)region;
+	ret = RegSetValueEx(hKey, L"Region", 0, REG_DWORD, (const BYTE*)&data, sizeof(DWORD));
 	if (FAILED(HRESULT_FROM_WIN32(ret)))
 	{
-		MessageBox(NULL, L"無法寫入 Hant", L"安裝失敗", MB_ICONERROR | MB_OK);
+		MessageBox(NULL, L"無法寫入安裝語言區域", L"安裝失敗", MB_ICONERROR | MB_OK);
 		return 1;
 	}
-
 	return 0;
 }
 
@@ -125,12 +143,22 @@ static int Run(LPTSTR lpCmdLine)
 	bool uninstalling = !wcscmp(L"/u", lpCmdLine);
 	if (uninstalling)
 		return uninstall(silent);
-	bool hans = !wcscmp(L"/s", lpCmdLine);
-	if (hans)
-		return install(false, silent);
-	bool hant = !wcscmp(L"/t", lpCmdLine);
-	if (hant)
-		return install(true, silent);
+	if (!wcscmp(L"/CN", lpCmdLine)) {
+		return install(InstallRegion::CN, silent);
+	}
+	if (!wcscmp(L"/TW", lpCmdLine)) {
+		return install(InstallRegion::TW, silent);
+	}
+	if (!wcscmp(L"/SG", lpCmdLine)) {
+		return install(InstallRegion::SG, silent);
+	}
+	if (!wcscmp(L"/MO", lpCmdLine)) {
+		return install(InstallRegion::MO, silent);
+	}
+	if (!wcscmp(L"/HK", lpCmdLine)) {
+		return install(InstallRegion::HK, silent);
+	}
+
 	bool installing = !wcscmp(L"/i", lpCmdLine);
 	return CustomInstall(installing);
 }

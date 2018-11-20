@@ -1,6 +1,8 @@
 #pragma once
 
 #include "resource.h"
+#include <WeaselCommon.h>
+#include <map>
 
 class InstallOptionsDialog : public CDialogImpl<InstallOptionsDialog>
 {
@@ -11,8 +13,11 @@ public:
 	~InstallOptionsDialog();
 
 	bool installed;
-	bool hant;
+	//bool hant;
+	InstallRegion region;
 	std::wstring user_dir;
+	static std::map<InstallRegion, int> region2radio;
+	static std::map<int, InstallRegion> radio2region;
 
 protected:
 	BEGIN_MSG_MAP(InstallOptionsDialog)
@@ -33,8 +38,9 @@ protected:
 
 	void UpdateWidgets();
 
-	CButton cn_;
-	CButton tw_;
+	std::map <InstallRegion, CButton> region_btns;
+	//CButton cn_;
+	//CButton tw_;
 	CButton remove_;
 	CButton default_dir_;
 	CButton custom_dir_;
